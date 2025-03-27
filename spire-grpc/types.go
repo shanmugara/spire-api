@@ -1,4 +1,4 @@
-package spire_api
+package spire_grpc
 
 import (
 	"github.com/sirupsen/logrus"

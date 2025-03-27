@@ -1,4 +1,4 @@
-package spire_api
+package spire_grpc
 
 import (
 	"context"
@@ -8,24 +8,25 @@ import (
 )
 
 const (
-	ParentNamespace      = "spire"
-	ParentServiceAccount = "spire-agent"
-	ParentRoot           = "/spire/server"
-	NS                   = "ns"
-	SA                   = "sa"
-	AgentNS              = "agent_ns"
-	AgentSA              = "agent_sa"
+	AgentNamespace      = "spire"
+	AgentServiceAccount = "spire-agent"
+	ParentRoot          = "/spire/server"
+	NS                  = "ns"
+	SA                  = "sa"
+	KeyAgentNS          = "agent_ns"
+	KeyAgentSA          = "agent_sa"
 )
 
-func (sc *SPIREClient) GetEntries() {
+func (sc *SPIREClient) GetEntries() ([]*types.Entry, error) {
 	resp, err := (sc.Client).ListEntries(context.Background(), &entrypb.ListEntriesRequest{})
 	if err != nil {
 		sc.Logger.Errorf("Failed to list entries: %v", err)
-		return
+		return nil, fmt.Errorf(err.Error())
 	}
 	for _, entry := range resp.Entries {
 		sc.Logger.Infof("Entry: %v", entry)
 	}
+	return resp.Entries, nil
 }
 
 func (sc *SPIREClient) GetEntryByID(id string) {
@@ -37,16 +38,34 @@ func (sc *SPIREClient) GetEntryByID(id string) {
 	sc.Logger.Infof("Entry: %v", resp.SpiffeId)
 }
 
+func (sc *SPIREClient) GetEntryBySPIFFE(e *Entry) {
+	sc.Logger.Infof("fetching entry by spiffeID")
+	spiffeID := &types.SPIFFEID{
+		TrustDomain: e.TrustDomain,
+		Path:        fmt.Sprintf("/ns/%s/sa/%s", e.Namespace, e.ServiceAccount),
+	}
+	req := &entrypb.ListEntriesRequest{
+		Filter: &entrypb.ListEntriesRequest_Filter{
+			BySpiffeId: spiffeID,
+		},
+	}
+	resp, err := (sc.Client).ListEntries(context.Background(), req)
+	if err != nil {
+		sc.Logger.Errorf("Error listing entry by spiffeid %s", err.Error())
+	}
+	sc.Logger.Infof("%s", resp.Entries)
+}
+
 func (sc *SPIREClient) CreateEntry(e *Entry) {
 	sc.Logger.Infof("Creating entry")
 
-	pPath := fmt.Sprintf("/ns/%s/sa/%s", ParentNamespace, ParentServiceAccount)
-	ns_key := NS
-	sa_key := SA
-	if e.ServiceAccount == ParentServiceAccount && e.Namespace == ParentNamespace {
+	pPath := fmt.Sprintf("/ns/%s/sa/%s", AgentNamespace, AgentServiceAccount)
+	nsKey := NS
+	saKey := SA
+	if e.ServiceAccount == AgentServiceAccount && e.Namespace == AgentNamespace {
 		pPath = ParentRoot
-		ns_key = AgentNS
-		sa_key = AgentSA
+		nsKey = KeyAgentNS
+		saKey = KeyAgentSA
 	}
 
 	var sel []*types.Selector
@@ -58,11 +77,11 @@ func (sc *SPIREClient) CreateEntry(e *Entry) {
 		},
 		&types.Selector{
 			Type:  "k8s_psat",
-			Value: fmt.Sprintf("%s:%s", ns_key, e.Namespace),
+			Value: fmt.Sprintf("%s:%s", nsKey, e.Namespace),
 		},
 		&types.Selector{
 			Type:  "k8s_psat",
-			Value: fmt.Sprintf("%s:%s", sa_key, e.ServiceAccount),
+			Value: fmt.Sprintf("%s:%s", saKey, e.ServiceAccount),
 		},
 	)
 
