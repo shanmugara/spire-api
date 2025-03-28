@@ -1,29 +1,19 @@
 package main
 
 import (
+	"flag"
 	"github.com/sirupsen/logrus"
 	server "spire-api/api"
 )
 
-const (
-	CERT = "spire-api.crt"
-	KEY  = "spire-api.key"
-	CA   = "ca.crt"
-)
-
 func main() {
+	//add argument for server address
+	serverAddress := flag.String("server", "omegaspire01.omegaworld.net", "SPIRE server address")
+	serverPort := flag.Int("port", 8081, "SPIRE server port")
+	apiPort := flag.Int("api-port", 8080, "API server port")
+	flag.Parse()
+
 	logger := logrus.New()
 	logger.Info("Calling Start...")
-	server.Start("omegaspire01.omegaworld.net:8081")
+	server.Start(*serverAddress, *serverPort, *apiPort)
 }
-
-//	e := &spire_grpc.Entry{
-//		TrustDomain:    "wl.dev.omegaworld.net",
-//		ServiceAccount: "dummy3",
-//		Namespace:      "myapp",
-//		Cluster:        "ambient-b",
-//	}
-//	//sc.GetEntryByID("b4bd7e0d-cb1d-4a93-bb8b-fe8b5314e0ae")
-//	//sc.CreateEntry(e)
-//	sc.GetEntryBySPIFFE(e)
-//}

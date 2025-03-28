@@ -43,16 +43,16 @@ func NewClient(s string) (*SPIREClient, error) {
 	}
 	grpcCreds := credentials.NewTLS(tlsConfig)
 
-	logger.Infof("Connecting to SPIRE server: %v", spireServer)
+	logger.Infof("Creating connection to SPIRE server: %v", spireServer)
 
 	conn, err := grpc.Dial(spireServer, grpc.WithTransportCredentials(grpcCreds))
 
 	if err != nil {
-		logger.Errorf("Failed to connect to SPIRE server: %v", err)
+		logger.Errorf("Failed to create connection to SPIRE server: %v", err)
 		return nil, err
 	}
 
-	logger.Info("Connected to SPIRE server")
+	logger.Info("Connection created to SPIRE server")
 
 	sc := &SPIREClient{
 		Logger:   logrus.New(),

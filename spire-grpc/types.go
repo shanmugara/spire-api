@@ -7,10 +7,10 @@ import (
 )
 
 type Entry struct {
-	TrustDomain    string
-	ServiceAccount string
-	Namespace      string
-	Cluster        string
+	TrustDomain    string `json:"trustDomain" required:"true"`
+	ServiceAccount string `json:"serviceAccount" required:"true"`
+	Namespace      string `json:"namespace" required:"true"`
+	Cluster        string `json:"cluster" required:"true"`
 }
 
 type SPIREClient struct {

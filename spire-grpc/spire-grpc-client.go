@@ -38,7 +38,7 @@ func (sc *SPIREClient) GetEntryByID(id string) {
 	sc.Logger.Infof("Entry: %v", resp.SpiffeId)
 }
 
-func (sc *SPIREClient) GetEntryBySPIFFE(e *Entry) {
+func (sc *SPIREClient) GetEntryBySPIFFE(e *Entry) ([]*types.Entry, error) {
 	sc.Logger.Infof("fetching entry by spiffeID")
 	spiffeID := &types.SPIFFEID{
 		TrustDomain: e.TrustDomain,
@@ -52,11 +52,13 @@ func (sc *SPIREClient) GetEntryBySPIFFE(e *Entry) {
 	resp, err := (sc.Client).ListEntries(context.Background(), req)
 	if err != nil {
 		sc.Logger.Errorf("Error listing entry by spiffeid %s", err.Error())
+		return nil, err
 	}
 	sc.Logger.Infof("%s", resp.Entries)
+	return resp.Entries, nil
 }
 
-func (sc *SPIREClient) CreateEntry(e *Entry) {
+func (sc *SPIREClient) CreateEntry(e *Entry) error {
 	sc.Logger.Infof("Creating entry")
 
 	pPath := fmt.Sprintf("/ns/%s/sa/%s", AgentNamespace, AgentServiceAccount)
@@ -104,7 +106,32 @@ func (sc *SPIREClient) CreateEntry(e *Entry) {
 	resp, err := (sc.Client).BatchCreateEntry(context.Background(), entry)
 	if err != nil {
 		sc.Logger.Errorf("Failed to create entry: %v", err)
-		return
+		return err
 	}
 	sc.Logger.Infof("Entry: %v", resp.Results)
+	return nil
+}
+
+func (sc *SPIREClient) DeleteEntryBySPIFFE(e *Entry) error {
+	sc.Logger.Infof("Fetching entry by spiffeID first")
+	resp, err := sc.GetEntryBySPIFFE(e)
+	if err != nil {
+		sc.Logger.Errorf("Failed to get entry by spiffeID: %v, may be deleted. ignoring", err)
+		return nil
+	}
+	var entryIDs []string
+	for _, entry := range resp {
+		entryIDs = append(entryIDs, entry.Id)
+	}
+	sc.Logger.Infof("Deleting entry by spiffeID")
+
+	delresp, err := (sc.Client).BatchDeleteEntry(context.Background(), &entrypb.BatchDeleteEntryRequest{
+		Ids: entryIDs,
+	})
+	if err != nil {
+		sc.Logger.Errorf("Failed to delete entry: %v", err)
+		return err
+	}
+	sc.Logger.Infof("Entry: %v", delresp.Results)
+	return nil
 }
