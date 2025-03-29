@@ -16,10 +16,9 @@ const (
 	CA   = "certs/ca.crt"
 )
 
-func NewClient(s string) (*SPIREClient, error) {
+func NewClient(spireServer string) (*SPIREClient, error) {
 	logger := logrus.New()
 
-	spireServer := s
 	caCert, err := os.ReadFile(CA)
 	if err != nil {
 		logger.Errorf("Failed to read CA file: %v", err)

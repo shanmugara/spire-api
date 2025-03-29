@@ -11,22 +11,22 @@ import (
 
 func Start(s string, p int, ap int) {
 	logger := logrus.New()
-	logger.Info("Initialize api server...")
-	server := fmt.Sprintf("%s:%d", s, p)
+	logger.Info("Initialize api serverAndPort...")
+	serverAndPort := fmt.Sprintf("%s:%d", s, p)
 
-	sc, err := client.NewClient(server)
+	spireClient, err := client.NewClient(serverAndPort)
 	if err != nil {
-		logger.Errorf("Failed to connect to SPIRE server: %v", err)
+		logger.Errorf("Failed to connect to SPIRE serverAndPort: %v", err)
 		return
 	}
-	defer sc.GRPCConn.Close()
+	defer spireClient.GRPCConn.Close()
 	router := gin.Default()
-	router.GET("/v1/entries", GetEntries(sc))
-	router.POST("/v1/entries/add", CreateEntry(sc))
-	router.POST("/v1/entries/delete", DeleteEntry(sc))
+	router.GET("/v1/entries", GetEntries(spireClient))
+	router.POST("/v1/entries/add", CreateEntry(spireClient))
+	router.POST("/v1/entries/delete", DeleteEntry(spireClient))
 
 	if err := router.Run(fmt.Sprintf(":%d", ap)); err != nil {
-		logger.Errorf("Failed to start server: %v", err)
+		logger.Errorf("Failed to start serverAndPort: %v", err)
 		return
 	}
 }
