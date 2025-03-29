@@ -1,0 +1,6 @@
+{
+  "trustDomain": "wl.dev.omegaworld.net",
+  "serviceAccount": "myapp3",
+  "namespace": "myapp",
+  "cluster": "ambient-a"
+}

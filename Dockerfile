@@ -1,5 +1,4 @@
 # syntax=docker/dockerfile:experimental
-# ---
 FROM golang:1.23 AS build
 
 ENV GOOS=linux
@@ -10,11 +9,11 @@ WORKDIR /work
 COPY . /work
 
 RUN --mount=type=cache,target=/root/.cache/go-build,sharing=private \
-  go build -o bin/spire-api . \
+  go build -o bin/spire-api .
 
 # ---
 FROM scratch AS run
 
 COPY --from=build /work/bin/spire-api /usr/local/bin/
-
-ENTRYPOINT ["spire-api"]
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/spire-api"]

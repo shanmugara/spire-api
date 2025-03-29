@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	CERT = "spire-api.crt"
-	KEY  = "spire-api.key"
-	CA   = "ca.crt"
+	CERT = "certs/spire-api.crt"
+	KEY  = "certs/spire-api.key"
+	CA   = "certs/ca.crt"
 )
 
 func NewClient(s string) (*SPIREClient, error) {
