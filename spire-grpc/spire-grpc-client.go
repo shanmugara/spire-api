@@ -2,6 +2,7 @@ package spire_grpc
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	entrypb "github.com/spiffe/spire-api-sdk/proto/spire/api/server/entry/v1"
 	"github.com/spiffe/spire-api-sdk/proto/spire/api/types"
@@ -16,6 +17,12 @@ const (
 	KeyAgentNS          = "agent_ns"
 	KeyAgentSA          = "agent_sa"
 )
+
+type entryID string
+
+//TODO: Receive a kubeconfig in CreateEntry
+//TODO: Update server.conf with the kubeconfig
+//TODO: Watch for cert file updates and reload the server.conf
 
 func (sc *SPIREClient) GetEntries() ([]*types.Entry, error) {
 	resp, err := (sc.Client).ListEntries(context.Background(), &entrypb.ListEntriesRequest{})
@@ -58,7 +65,7 @@ func (sc *SPIREClient) GetEntryBySPIFFE(e *Entry) ([]*types.Entry, error) {
 	return resp.Entries, nil
 }
 
-func (sc *SPIREClient) CreateEntry(e *Entry) error {
+func (sc *SPIREClient) CreateEntry(e *Entry) (*entryID, error) {
 	sc.Logger.Infof("Creating entry")
 
 	pPath := fmt.Sprintf("/ns/%s/sa/%s", AgentNamespace, AgentServiceAccount)
@@ -106,10 +113,13 @@ func (sc *SPIREClient) CreateEntry(e *Entry) error {
 	resp, err := (sc.Client).BatchCreateEntry(context.Background(), entry)
 	if err != nil {
 		sc.Logger.Errorf("Failed to create entry: %v", err)
-		return err
+		return nil, err
 	}
-	sc.Logger.Infof("Entry: %v", resp.Results)
-	return nil
+
+	eID := entryID(resp.Results[0].Entry.Id)
+	sc.Logger.Infof("EntryID: %v", eID)
+
+	return &eID, nil
 }
 
 func (sc *SPIREClient) DeleteEntryBySPIFFE(e *Entry) error {
@@ -133,5 +143,26 @@ func (sc *SPIREClient) DeleteEntryBySPIFFE(e *Entry) error {
 		return err
 	}
 	sc.Logger.Infof("Entry: %v", delresp.Results)
+	return nil
+}
+
+func (sc *SPIREClient) RegisterKubeConfig(e *Entry) error {
+	// Placeholder for registering kubeconfig, if needed
+	if e.KubeConfig == "" {
+		sc.Logger.Infof("No kubeconfig provided for entry, skipping registration")
+		return nil
+	}
+	kcBytes := e.KubeConfig
+	kcDecoded, err := base64.StdEncoding.DecodeString(kcBytes)
+	if err != nil {
+		sc.Logger.Errorf("Failed to decode kubeconfig: %v", err)
+		return err
+	}
+	//DEBUG
+	sc.Logger.Infof("Registering kubeconfig for entry: %v", kcDecoded)
+
+	sc.Logger.Infof("Registering kubeconfig for entry: %v", e)
+	// In a real implementation, you would call the appropriate SPIRE API to register the kubeconfig
+	// For now, just return nil to indicate success
 	return nil
 }

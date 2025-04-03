@@ -24,6 +24,7 @@ func Start(s string, p int, ap int) {
 	router.GET("/v1/entries", GetEntries(spireClient))
 	router.POST("/v1/entries/add", CreateEntry(spireClient))
 	router.POST("/v1/entries/delete", DeleteEntry(spireClient))
+	router.POST("/v1/kubeconfig", KubeConfig(spireClient)) // Placeholder for KubeConfig function, if needed
 
 	if err := router.Run(fmt.Sprintf(":%d", ap)); err != nil {
 		logger.Errorf("Failed to start serverAndPort: %v", err)
@@ -49,12 +50,12 @@ func CreateEntry(sc *client.SPIREClient) gin.HandlerFunc {
 			c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		err := sc.CreateEntry(e)
+		entryID, err := sc.CreateEntry(e)
 		if err != nil {
 			c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.IndentedJSON(http.StatusOK, gin.H{"message": "Entry created"})
+		c.IndentedJSON(http.StatusOK, gin.H{"message": "Entry created", "entryID": entryID})
 	}
 }
 
@@ -71,5 +72,13 @@ func DeleteEntry(sc *client.SPIREClient) gin.HandlerFunc {
 			return
 		}
 		c.IndentedJSON(http.StatusOK, gin.H{"message": "Entry deleted"})
+	}
+}
+
+func KubeConfig(sc *client.SPIREClient) gin.HandlerFunc {
+	// Placeholder function for KubeConfig
+	return func(c *gin.Context) {
+		// Implement your logic to return kubeconfig if needed
+		c.IndentedJSON(http.StatusNotImplemented, gin.H{"message": "KubeConfig not implemented"})
 	}
 }
