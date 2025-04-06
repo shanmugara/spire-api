@@ -11,7 +11,8 @@ type Entry struct {
 	ServiceAccount string `json:"serviceAccount" required:"true"`
 	Namespace      string `json:"namespace" required:"true"`
 	Cluster        string `json:"cluster" required:"true"`
-	KubeConfig     string `json:"kubeConfig,omitempty"` // Optional, used for KubeConfig entries
+	KubeConfig     string `json:"kubeConfig,omitempty"`
+	SpireDir       string `json:"spireDir,omitempty"` // Optional, used for KubeConfig entries
 }
 
 type SPIREClient struct {
@@ -20,40 +21,21 @@ type SPIREClient struct {
 	Client   entrypb.EntryClient
 }
 
-// create structs for HCL mapping
+// create structs for SPIRE configurations for K8S and Bundle
 
-type Plugins struct {
-	Notifier     Notifier     `hcl:"notifier"`
-	NodeAttestor NodeAttestor `hcl:"node_attestor"`
+type K8SPSATConfig struct {
+	Clusters []map[string]PSATCluster `json:"clusters"`
 }
 
-type Notifier struct {
-	Type       string           `hcl:"type,label"` // e.g., "k8sbundle"
-	PluginData NotifyPluginData `hcl:"plugin_data,block"`
+type PSATCluster struct {
+	ServiceAccountAllowList []string `json:"service_account_allow_list"`
+	KubeConfigFile          string   `json:"kube_config_file"`
 }
 
-type NotifyPluginData struct {
-	PluginData NotifyClusters `hcl:"plugin_data,block"`
-}
-type NotifyClusters struct {
-	Clusters []NotifyClusterConfig `hcl:"cluster"`
+type K8SBundleConfig struct {
+	Clusters []BundleCluster `json:"clusters"`
 }
 
-type NotifyClusterConfig struct {
-	Namespace      string `hcl:"namespace"`
-	KubeconfigPath string `hcl:"kube_config_file_path"`
-}
-
-type NodeAttestor struct {
-	Name       string         `hcl:"name,label"`
-	PluginData PSATPluginData `hcl:"plugin_data, block"`
-}
-
-type PSATPluginData struct {
-	Clusters map[string]PSATClusterConfig `hcl:"clusters"`
-}
-
-type PSATClusterConfig struct {
-	ServiceAccountAllowList []string `hcl:"service_account_allow_list"`
-	KubeConfigFile          string   `hcl:"kube_config_file"`
+type BundleCluster struct {
+	KubeConfigFilePath string `json:"kube_config_file_path"`
 }
