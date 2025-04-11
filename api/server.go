@@ -9,12 +9,12 @@ import (
 	grpc "spire-api/spire-grpc"
 )
 
-func Start(s string, p int, ap int, sd string) {
+func Start(s string, p int, ap int, sd string, td string) {
 	logger := logrus.New()
 	logger.Info("Initialize api serverAndPort...")
 	serverAndPort := fmt.Sprintf("%s:%d", s, p)
 
-	spireClient, err := client.NewClient(serverAndPort)
+	spireClient, err := client.NewSpiffeClient(serverAndPort, td)
 	if err != nil {
 		logger.Errorf("Failed to connect to SPIRE serverAndPort: %v", err)
 		return

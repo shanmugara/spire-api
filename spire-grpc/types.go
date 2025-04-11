@@ -12,7 +12,7 @@ type Entry struct {
 	Namespace      string `json:"namespace" required:"true"`
 	Cluster        string `json:"cluster" required:"true"`
 	KubeConfig     string `json:"kubeConfig,omitempty"`
-	SpireDir       string `json:"spireDir,omitempty"` // Optional, used for KubeConfig entries
+	SpireDir       string `json:"spireDir,omitempty"`
 }
 
 type SPIREClient struct {

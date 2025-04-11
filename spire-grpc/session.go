@@ -1,9 +1,15 @@
 package spire_grpc
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"github.com/sirupsen/logrus"
+	"github.com/spiffe/go-spiffe/v2/spiffegrpc/grpccredentials"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	entrypb "github.com/spiffe/spire-api-sdk/proto/spire/api/server/entry/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -11,9 +17,10 @@ import (
 )
 
 const (
-	CERT = "certs/spire-api.crt"
-	KEY  = "certs/spire-api.key"
-	CA   = "certs/ca.crt"
+	CERT         = "certs/spire-api.crt"
+	KEY          = "certs/spire-api.key"
+	CA           = "certs/ca.crt"
+	SPIRE_SOCKET = "unix:///run/spire/sockets/api.sock"
 )
 
 func NewClient(spireServer string) (*SPIREClient, error) {
@@ -44,7 +51,7 @@ func NewClient(spireServer string) (*SPIREClient, error) {
 
 	logger.Infof("Creating connection to SPIRE server: %v", spireServer)
 
-	conn, err := grpc.Dial(spireServer, grpc.WithTransportCredentials(grpcCreds))
+	conn, err := grpc.NewClient(spireServer, grpc.WithTransportCredentials(grpcCreds))
 
 	if err != nil {
 		logger.Errorf("Failed to create connection to SPIRE server: %v", err)
@@ -58,5 +65,34 @@ func NewClient(spireServer string) (*SPIREClient, error) {
 		GRPCConn: conn,
 		Client:   entrypb.NewEntryClient(conn),
 	}
+	return sc, nil
+}
+
+func NewSpiffeClient(spireServer string, trustDomain string) (*SPIREClient, error) {
+	logger := logrus.New()
+	logger.Info("Creating new spiffe source...")
+	ctx := context.Background()
+	source, err := workloadapi.NewX509Source(ctx,
+		workloadapi.WithClientOptions(workloadapi.WithAddr(SPIRE_SOCKET)))
+	if err != nil {
+		logger.Errorf("Failed to create X509 source: %v", err)
+		return nil, err
+	}
+
+	logger.Info("Creating new connection...")
+	serverID := spiffeid.RequireFromString(fmt.Sprintf("spiffe://%s/spire/server", trustDomain))
+	conn, err := grpc.NewClient(spireServer, grpc.WithTransportCredentials(
+		grpccredentials.MTLSClientCredentials(source, source, tlsconfig.AuthorizeID(serverID))))
+	if err != nil {
+		logger.Errorf("Failed to create gRPC connection: %v", err)
+		return nil, err
+	}
+
+	sc := &SPIREClient{
+		Logger:   logrus.New(),
+		GRPCConn: conn,
+		Client:   entrypb.NewEntryClient(conn),
+	}
+
 	return sc, nil
 }

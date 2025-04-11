@@ -12,6 +12,7 @@ func main() {
 	serverPort := flag.Int("port", 8081, "SPIRE server port")
 	apiPort := flag.Int("api-port", 8080, "API server port")
 	spireDir := flag.String("spire-dir", "/opt/spire", "SPIRE directory path")
+	trusDomain := flag.String("trust-domain", "wl.dev.omegaworld.net", "Trust domain for SPIRE")
 	flag.Parse()
 
 	logger := logrus.New()
