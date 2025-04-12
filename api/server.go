@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	client "spire-api/spire-grpc"
+	//client "spire-api/spire-client"
 	grpc "spire-api/spire-grpc"
 )
 
@@ -14,7 +14,7 @@ func Start(s string, p int, ap int, sd string, td string) {
 	logger.Info("Initialize api serverAndPort...")
 	serverAndPort := fmt.Sprintf("%s:%d", s, p)
 
-	spireClient, err := client.NewSpiffeClient(serverAndPort, td)
+	spireClient, err := grpc.NewSpireClient(serverAndPort, td)
 	if err != nil {
 		logger.Errorf("Failed to connect to SPIRE serverAndPort: %v", err)
 		return
@@ -24,7 +24,6 @@ func Start(s string, p int, ap int, sd string, td string) {
 	router.GET("/v1/entries", GetEntries(spireClient))
 	router.POST("/v1/entries/add", CreateEntry(spireClient, sd))
 	router.POST("/v1/entries/delete", DeleteEntry(spireClient, sd))
-	router.POST("/v1/kubeconfig", KubeConfig(spireClient)) // Placeholder for KubeConfig function, if needed
 
 	if err := router.Run(fmt.Sprintf(":%d", ap)); err != nil {
 		logger.Errorf("Failed to start serverAndPort: %v", err)
@@ -32,7 +31,7 @@ func Start(s string, p int, ap int, sd string, td string) {
 	}
 }
 
-func GetEntries(sc *client.SPIREClient) gin.HandlerFunc {
+func GetEntries(sc *grpc.SPIREClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		entries, err := sc.GetEntries()
 		if err != nil {
@@ -43,7 +42,7 @@ func GetEntries(sc *client.SPIREClient) gin.HandlerFunc {
 	}
 }
 
-func CreateEntry(sc *client.SPIREClient, sd string) gin.HandlerFunc {
+func CreateEntry(sc *grpc.SPIREClient, sd string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var e *grpc.Entry
 		if err := c.ShouldBindJSON(&e); err != nil {
@@ -86,7 +85,7 @@ func CreateEntry(sc *client.SPIREClient, sd string) gin.HandlerFunc {
 	}
 }
 
-func DeleteEntry(sc *client.SPIREClient, sd string) gin.HandlerFunc {
+func DeleteEntry(sc *grpc.SPIREClient, sd string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var e *grpc.Entry
 		if err := c.ShouldBindJSON(&e); err != nil {
@@ -100,13 +99,5 @@ func DeleteEntry(sc *client.SPIREClient, sd string) gin.HandlerFunc {
 			return
 		}
 		c.IndentedJSON(http.StatusOK, gin.H{"message": "Entry deleted"})
-	}
-}
-
-func KubeConfig(sc *client.SPIREClient) gin.HandlerFunc {
-	// Placeholder function for KubeConfig
-	return func(c *gin.Context) {
-		// Implement your logic to return kubeconfig if needed
-		c.IndentedJSON(http.StatusNotImplemented, gin.H{"message": "KubeConfig not implemented"})
 	}
 }

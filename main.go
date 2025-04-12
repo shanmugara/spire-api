@@ -17,5 +17,5 @@ func main() {
 
 	logger := logrus.New()
 	logger.Info("Calling Start...")
-	server.Start(*serverAddress, *serverPort, *apiPort, *spireDir)
+	server.Start(*serverAddress, *serverPort, *apiPort, *spireDir, *trusDomain)
 }

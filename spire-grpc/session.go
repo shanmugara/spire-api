@@ -17,13 +17,45 @@ import (
 )
 
 const (
-	CERT         = "certs/spire-api.crt"
-	KEY          = "certs/spire-api.key"
-	CA           = "certs/ca.crt"
-	SPIRE_SOCKET = "unix:///run/spire/sockets/api.sock"
+	CERT        = "certs/spire-api.crt"
+	KEY         = "certs/spire-api.key"
+	CA          = "certs/ca.crt"
+	SpireSocket = "unix:///run/spire/sockets/api.sock"
 )
 
+func NewSpireClient(spireServer string, trustDomain string) (*SPIREClient, error) {
+	// Create a new SPIRE client using the SPIFFE Workload API
+	logger := logrus.New()
+	logger.Info("Creating new spire source...")
+	ctx := context.Background()
+	source, err := workloadapi.NewX509Source(ctx,
+		workloadapi.WithClientOptions(workloadapi.WithAddr(SpireSocket)))
+	if err != nil {
+		logger.Errorf("Failed to create X509 source: %v", err)
+		return nil, err
+	}
+
+	logger.Info("Creating new connection...")
+	// MTLS connection to SPIRE server
+	serverID := spiffeid.RequireFromString(fmt.Sprintf("spiffe://%s/spire/server", trustDomain))
+	conn, err := grpc.NewClient(spireServer, grpc.WithTransportCredentials(
+		grpccredentials.MTLSClientCredentials(source, source, tlsconfig.AuthorizeID(serverID))))
+	if err != nil {
+		logger.Errorf("Failed to create gRPC connection: %v", err)
+		return nil, err
+	}
+
+	sc := &SPIREClient{
+		Logger:   logrus.New(),
+		GRPCConn: conn,
+		Client:   entrypb.NewEntryClient(conn),
+	}
+
+	return sc, nil
+}
+
 func NewClient(spireServer string) (*SPIREClient, error) {
+	// Create a new SPIRE client using cert and key files
 	logger := logrus.New()
 
 	caCert, err := os.ReadFile(CA)
@@ -65,34 +97,5 @@ func NewClient(spireServer string) (*SPIREClient, error) {
 		GRPCConn: conn,
 		Client:   entrypb.NewEntryClient(conn),
 	}
-	return sc, nil
-}
-
-func NewSpiffeClient(spireServer string, trustDomain string) (*SPIREClient, error) {
-	logger := logrus.New()
-	logger.Info("Creating new spiffe source...")
-	ctx := context.Background()
-	source, err := workloadapi.NewX509Source(ctx,
-		workloadapi.WithClientOptions(workloadapi.WithAddr(SPIRE_SOCKET)))
-	if err != nil {
-		logger.Errorf("Failed to create X509 source: %v", err)
-		return nil, err
-	}
-
-	logger.Info("Creating new connection...")
-	serverID := spiffeid.RequireFromString(fmt.Sprintf("spiffe://%s/spire/server", trustDomain))
-	conn, err := grpc.NewClient(spireServer, grpc.WithTransportCredentials(
-		grpccredentials.MTLSClientCredentials(source, source, tlsconfig.AuthorizeID(serverID))))
-	if err != nil {
-		logger.Errorf("Failed to create gRPC connection: %v", err)
-		return nil, err
-	}
-
-	sc := &SPIREClient{
-		Logger:   logrus.New(),
-		GRPCConn: conn,
-		Client:   entrypb.NewEntryClient(conn),
-	}
-
 	return sc, nil
 }
