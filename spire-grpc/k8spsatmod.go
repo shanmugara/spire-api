@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 const (
@@ -51,7 +52,7 @@ func (sc *SPIREClient) MakePSATCluster(e *Entry) *PSATCluster {
 	kc := e.Cluster + ".yaml"
 	pc := &PSATCluster{
 		ServiceAccountAllowList: []string{"spire:spire-agent"},
-		KubeConfigFile:          filepath.Join(e.SpireDir, kc), // This can be set later when creating the entry
+		KubeConfigFile:          filepath.Join(e.SpireDir, "kubeconfigs", kc),
 	}
 	return pc
 }
@@ -60,12 +61,12 @@ func (sc *SPIREClient) MakeK8sBundleCluster(e *Entry) *BundleCluster {
 	sc.Logger.Infof("Creating BundleCluster instance")
 	kc := e.Cluster + ".yaml"
 	bc := &BundleCluster{
-		KubeConfigFilePath: filepath.Join(e.SpireDir, kc),
+		KubeConfigFilePath: filepath.Join(e.SpireDir, "kubeconfigs", kc),
 	}
 	return bc
 }
 
-func (sc *SPIREClient) UpdateK8sPsat(e *Entry) error {
+func (sc *SPIREClient) AddK8sPsat(e *Entry) error {
 	currentPsat, err := sc.GetK8sPsatConfig(e)
 	if err != nil {
 		sc.Logger.Errorf("Failed to get current k8s_psat config: %v", err)
@@ -75,20 +76,27 @@ func (sc *SPIREClient) UpdateK8sPsat(e *Entry) error {
 	UpdateCluster := false // Flag to check if we need to update an existing cluster
 
 	// Check if cluster already exists in the current configuration
-	for _, cluster := range currentPsat.Clusters {
-		// Check if the cluster already exists in the configuration
-		if _, Exists := cluster[e.Cluster]; Exists {
-			sc.Logger.Infof("Cluster %s already exists in k8s_psat config, updating it", e.Cluster)
-			UpdateCluster = true
-			// Update the existing cluster's KubeConfigFile if needed
-			cluster[e.Cluster] = *newCluster
-		}
+	//for _, cluster := range currentPsat.Clusters {
+	//	// Check if the cluster already exists in the configuration
+	//	if _, Exists := cluster[e.Cluster]; Exists {
+	//		sc.Logger.Infof("Cluster %s already exists in k8s_psat config, updating it", e.Cluster)
+	//		UpdateCluster = true
+	//		// Update the existing cluster's KubeConfigFile if needed
+	//		cluster[e.Cluster] = *newCluster
+	//	}
+	//}
+
+	if _, exists := currentPsat.Clusters[0][e.Cluster]; exists {
+		sc.Logger.Infof("Cluster %s already exists in k8s_psat config, updating it...", e.Cluster)
+		UpdateCluster = true
+		currentPsat.Clusters[0][e.Cluster] = *newCluster
 	}
 
 	// Append the new cluster to the existing clusters
 	if currentPsat != nil && UpdateCluster == false {
 		sc.Logger.Infof("Appending new cluster %s to k8s_psat config", e.Cluster)
-		currentPsat.Clusters = append(currentPsat.Clusters, map[string]PSATCluster{e.Cluster: *newCluster})
+		currentPsat.Clusters[0][e.Cluster] = *newCluster
+		//currentPsat.Clusters = append(currentPsat.Clusters, map[string]PSATCluster{e.Cluster: *newCluster})
 	}
 	outFile, err := json.MarshalIndent(currentPsat, "", "  ")
 	if err != nil {
@@ -96,7 +104,7 @@ func (sc *SPIREClient) UpdateK8sPsat(e *Entry) error {
 		return err
 	}
 	// Write the updated config back to file
-	if err := os.WriteFile(filepath.Join(e.SpireDir, "kubeconfigs", k8sPsatConfigFile), outFile, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(e.SpireDir, k8sPsatConfigFile), outFile, 0644); err != nil {
 		sc.Logger.Errorf("Failed to write updated k8s_psat config file: %v", err)
 		return err
 	}
@@ -104,7 +112,7 @@ func (sc *SPIREClient) UpdateK8sPsat(e *Entry) error {
 	return nil
 }
 
-func (sc *SPIREClient) UpdateK8sBundle(e *Entry) error {
+func (sc *SPIREClient) AddK8sBundle(e *Entry) error {
 	currentBundle, err := sc.GetK8sBundleConfig(e)
 	if err != nil {
 		sc.Logger.Errorf("Failed to get current k8s_bundle config: %v", err)
@@ -112,7 +120,14 @@ func (sc *SPIREClient) UpdateK8sBundle(e *Entry) error {
 	}
 	newCluster := sc.MakeK8sBundleCluster(e)
 	// Append the new cluster to the existing clusters
+
+	if ok := sc.BundleExists(currentBundle, newCluster); ok {
+		sc.Logger.Infof("Cluster %s already exists in k8s_bundle config, skipping update", e.Cluster)
+		return nil
+	}
+
 	if currentBundle != nil {
+		sc.Logger.Infof("Appending new cluster %s to k8s_bundle config", e.Cluster)
 		currentBundle.Clusters = append(currentBundle.Clusters, *newCluster)
 	}
 	outFile, err := json.MarshalIndent(currentBundle, "", "  ")
@@ -121,7 +136,7 @@ func (sc *SPIREClient) UpdateK8sBundle(e *Entry) error {
 		return err
 	}
 	// Write the updated config back to file
-	if err := os.WriteFile(filepath.Join(e.SpireDir, "kubeconfigs", k8sBundleConfigFile), outFile, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(e.SpireDir, k8sBundleConfigFile), outFile, 0644); err != nil {
 		sc.Logger.Errorf("Failed to write updated k8s_bundle config file: %v", err)
 		return err
 	}
@@ -169,4 +184,143 @@ func (sc *SPIREClient) WriteKubeconfig(e *Entry) error {
 	}
 	sc.Logger.Infof("Successfully wrote KubeConfig file: %v", kcFile)
 	return nil
+}
+
+func (sc *SPIREClient) DeleteKubeconfig(e *Entry) error {
+
+	kcFile := filepath.Join(e.SpireDir, "kubeconfigs", e.Cluster+".yaml")
+	if ok := sc.KubeconfigExists(e); !ok {
+		sc.Logger.Infof("Kubeconfig %s does not exist, skipping deletion", kcFile)
+		return nil
+	}
+	sc.Logger.Infof("Deleting KubeConfig: %v", kcFile)
+	if err := os.Remove(kcFile); err != nil {
+		sc.Logger.Errorf("Failed to delete KubeConfig file: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (sc *SPIREClient) DeleteK8sPsat(e *Entry) error {
+	currentPsat, err := sc.GetK8sPsatConfig(e)
+	//updatedPsat := &K8SPSATConfig{}
+
+	if err != nil {
+		sc.Logger.Errorf("Failed to get current k8s_psat config: %v", err)
+		return err
+	}
+	if ok := sc.PSATClusterExists(e, currentPsat); !ok {
+		sc.Logger.Infof("Cluster %s does not exist in k8s_psat config, skipping deletion", e.Cluster)
+		return nil
+	}
+	// the logic to create a new slice
+	//for _, cluster := range currentPsat.Clusters {
+	//	if _, ok := cluster[e.Cluster]; ok {
+	//		sc.Logger.Infof("Pre Deleting cluster %s from k8s_psat config slice", e.Cluster)
+	//	} else {
+	//		updatedPsat.Clusters = append(updatedPsat.Clusters, cluster)
+	//	}
+	//}
+	sc.Logger.Infof("Pre Deleting k8s_psat config: %v", e.Cluster)
+	delete(currentPsat.Clusters[0], e.Cluster)
+
+	outFile, err := json.MarshalIndent(currentPsat, "", "  ")
+	if err != nil {
+		sc.Logger.Errorf("Failed to marshal updated k8s_psat config: %v", err)
+		return err
+	}
+	// Write the updated config back to file
+	if err := os.WriteFile(filepath.Join(e.SpireDir, k8sPsatConfigFile), outFile, 0644); err != nil {
+		sc.Logger.Errorf("Failed to write updated k8s_psat config file: %v", err)
+		return err
+	}
+	sc.Logger.Infof("Successfully updated k8s_psat config file")
+
+	return nil
+}
+
+func (sc *SPIREClient) DeleteK8sBundle(e *Entry) error {
+	currentBundle, err := sc.GetK8sBundleConfig(e)
+	if err != nil {
+		sc.Logger.Errorf("Failed to get current k8s_bundle config: %v", err)
+		return err
+	}
+	updatedBundle := &K8SBundleConfig{}
+	if ok := sc.BundleExists(currentBundle, sc.MakeK8sBundleCluster(e)); !ok {
+		sc.Logger.Infof("Cluster %s does not exist in k8s_bundle config, skipping deletion", e.Cluster)
+		return nil
+	}
+	for _, cluster := range currentBundle.Clusters {
+		if cluster.KubeConfigFilePath == sc.MakeK8sBundleCluster(e).KubeConfigFilePath {
+			sc.Logger.Infof("Pre Deleting cluster %s from k8s_bundle config slice", e.Cluster)
+			continue
+		} else {
+			updatedBundle.Clusters = append(updatedBundle.Clusters, cluster)
+		}
+	}
+
+	outFile, err := json.MarshalIndent(updatedBundle, "", "  ")
+	if err != nil {
+		sc.Logger.Errorf("Failed to marshal updated k8s_bundle config: %v", err)
+	}
+	// Write the updated config back to file
+	if err := os.WriteFile(filepath.Join(e.SpireDir, k8sBundleConfigFile), outFile, 0644); err != nil {
+		sc.Logger.Errorf("Failed to write updated k8s_bundle config file: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (sc *SPIREClient) SigUsr1() error {
+	// Send SIGUSR1 to the SPIRE server process
+	pids, err := findPIDsByName("spire-server")
+	if err != nil {
+		sc.Logger.Errorf("Failed to find SPIRE server process: %v", err)
+		return err
+	}
+	if len(pids) == 0 {
+		sc.Logger.Warn("No SPIRE server process found")
+		return nil
+	}
+	for _, pid := range pids {
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			sc.Logger.Errorf("Failed to find SPIRE server process: %v", err)
+			continue
+		}
+		if err := proc.Signal(syscall.SIGUSR1); err != nil {
+			sc.Logger.Errorf("Failed to send SIGUSR1 to SPIRE server process: %v", err)
+			continue
+		}
+		sc.Logger.Infof("Sent SIGUSR1 to SPIRE server process with PID: %d", pid)
+	}
+	return nil
+}
+
+func (sc *SPIREClient) BundleExists(currBundle *K8SBundleConfig, cl *BundleCluster) bool {
+	for _, cluster := range currBundle.Clusters {
+		if cluster.KubeConfigFilePath == cl.KubeConfigFilePath {
+			sc.Logger.Infof("Cluster %s already exists in k8s_bundle config", cl.KubeConfigFilePath)
+			return true
+		}
+	}
+	return false
+
+}
+
+func (sc *SPIREClient) PSATClusterExists(e *Entry, currPsat *K8SPSATConfig) bool {
+	if _, exists := currPsat.Clusters[0][e.Cluster]; exists {
+		return true
+	}
+	return false
+}
+
+func (sc *SPIREClient) KubeconfigExists(e *Entry) bool {
+	kcFile := filepath.Join(e.SpireDir, "kubeconfigs", e.Cluster+".yaml")
+	if _, err := os.Stat(kcFile); err == nil {
+		return true
+	}
+	return false
 }

@@ -16,6 +16,10 @@ const (
 	SA                  = "sa"
 	KeyAgentNS          = "agent_ns"
 	KeyAgentSA          = "agent_sa"
+	ClusterSelectorPsat = "cluster"
+	ClusterSelectorK8s  = "pod-label:spiffe.io/cluster"
+	SpireK8s            = "k8s"
+	SpirePsat           = "k8s_psat"
 )
 
 type entryID string
@@ -67,29 +71,33 @@ func (sc *SPIREClient) GetEntryBySPIFFE(e *Entry) ([]*types.Entry, error) {
 
 func (sc *SPIREClient) CreateEntry(e *Entry) (*entryID, error) {
 	sc.Logger.Infof("Creating entry")
+	var sel []*types.Selector
 
 	pPath := fmt.Sprintf("/ns/%s/sa/%s", AgentNamespace, AgentServiceAccount)
 	nsKey := NS
 	saKey := SA
+	clusterSelector := ClusterSelectorK8s
+	spireKey := SpireK8s
+
 	if e.ServiceAccount == AgentServiceAccount && e.Namespace == AgentNamespace {
 		pPath = ParentRoot
 		nsKey = KeyAgentNS
 		saKey = KeyAgentSA
+		clusterSelector = ClusterSelectorPsat
+		spireKey = SpirePsat
 	}
-
-	var sel []*types.Selector
 
 	sel = append(sel,
 		&types.Selector{
-			Type:  "k8s_psat",
-			Value: fmt.Sprintf("cluster:%s", e.Cluster),
+			Type:  spireKey,
+			Value: fmt.Sprintf("%s:%s", clusterSelector, e.Cluster),
 		},
 		&types.Selector{
-			Type:  "k8s_psat",
+			Type:  spireKey,
 			Value: fmt.Sprintf("%s:%s", nsKey, e.Namespace),
 		},
 		&types.Selector{
-			Type:  "k8s_psat",
+			Type:  spireKey,
 			Value: fmt.Sprintf("%s:%s", saKey, e.ServiceAccount),
 		},
 	)

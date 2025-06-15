@@ -5,16 +5,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	//client "spire-api/spire-client"
 	grpc "spire-api/spire-grpc"
 )
 
-func Start(s string, p int, ap int, sd string, td string) {
+const (
+	AgentNamespace      = "spire"
+	AgentServiceAccount = "spire-agent"
+)
+
+func Start(s string, p int, ap int, sd string, td string, uds string) {
 	logger := logrus.New()
 	logger.Info("Initialize api serverAndPort...")
 	serverAndPort := fmt.Sprintf("%s:%d", s, p)
 
-	spireClient, err := grpc.NewSpireClient(serverAndPort, td)
+	spireClient, err := grpc.NewSpireClient(serverAndPort, td, uds)
 	if err != nil {
 		logger.Errorf("Failed to connect to SPIRE serverAndPort: %v", err)
 		return
@@ -64,22 +68,29 @@ func CreateEntry(sc *grpc.SPIREClient, sd string) gin.HandlerFunc {
 				return
 			}
 
-			err = sc.UpdateK8sPsat(e)
+			err = sc.AddK8sPsat(e)
 			if err != nil {
 				sc.Logger.Errorf("Failed to update k8s_psat config: %v", err)
 				c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			err = sc.UpdateK8sBundle(e)
-			if err != nil {
-				sc.Logger.Errorf("Failed to update k8s_bundle config: %v", err)
-				c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
+			// Remove bundle config since we'll be using http for bundle pull
+			//err = sc.AddK8sBundle(e)
+			//if err != nil {
+			//	sc.Logger.Errorf("Failed to update k8s_bundle config: %v", err)
+			//	c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			//	return
+			//}
 
 		} else {
 			sc.Logger.Warn("No KubeConfig provided in entry, skipping K8s configuration updates")
+		}
+
+		if err := sc.SigUsr1(); err != nil {
+			sc.Logger.Errorf("Failed to send SIGUSR1 to SPIRE serverAndPort: %v", err)
+			c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 		c.IndentedJSON(http.StatusOK, gin.H{"message": "Entry created", "entryID": entryID})
 	}
@@ -98,6 +109,34 @@ func DeleteEntry(sc *grpc.SPIREClient, sd string) gin.HandlerFunc {
 			c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
+		// If agent is being deleted, remove the associated K8s configurations
+		if e.ServiceAccount == AgentServiceAccount && e.Namespace == AgentNamespace {
+			if err := sc.DeleteK8sPsat(e); err != nil {
+				sc.Logger.Errorf("Failed to delete k8s_psat config: %v", err)
+				c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			// Remove bundle config since we'll be using http for bundle pull
+			//if err := sc.DeleteK8sBundle(e); err != nil {
+			//	sc.Logger.Errorf("Failed to delete k8s_bundle config: %v", err)
+			//	c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			//	return
+			//}
+
+			if err := sc.DeleteKubeconfig(e); err != nil {
+				sc.Logger.Errorf("Failed to delete kubeconfig: %v", err)
+				c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			if err := sc.SigUsr1(); err != nil {
+				sc.Logger.Errorf("Failed to send SIGUSR1 to SPIRE serverAndPort: %v", err)
+				c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+
 		c.IndentedJSON(http.StatusOK, gin.H{"message": "Entry deleted"})
 	}
 }

@@ -17,19 +17,18 @@ import (
 )
 
 const (
-	CERT        = "certs/spire-api.crt"
-	KEY         = "certs/spire-api.key"
-	CA          = "certs/ca.crt"
-	SpireSocket = "unix:///run/spire/sockets/api.sock"
+	CERT = "certs/spire-api.crt"
+	KEY  = "certs/spire-api.key"
+	CA   = "certs/ca.crt"
 )
 
-func NewSpireClient(spireServer string, trustDomain string) (*SPIREClient, error) {
+func NewSpireClient(spireServer string, trustDomain string, uds string) (*SPIREClient, error) {
 	// Create a new SPIRE client using the SPIFFE Workload API
 	logger := logrus.New()
 	logger.Info("Creating new spire source...")
 	ctx := context.Background()
 	source, err := workloadapi.NewX509Source(ctx,
-		workloadapi.WithClientOptions(workloadapi.WithAddr(SpireSocket)))
+		workloadapi.WithClientOptions(workloadapi.WithAddr(fmt.Sprintf("unix://%s", uds))))
 	if err != nil {
 		logger.Errorf("Failed to create X509 source: %v", err)
 		return nil, err
