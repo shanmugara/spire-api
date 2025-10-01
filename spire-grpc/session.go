@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/spiffegrpc/grpccredentials"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -13,7 +15,6 @@ import (
 	entrypb "github.com/spiffe/spire-api-sdk/proto/spire/api/server/entry/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"os"
 )
 
 const (
@@ -22,6 +23,7 @@ const (
 	CA   = "certs/ca.crt"
 )
 
+// NewSpireClient Code taken from https://github.com/spiffe/go-spiffe/blob/main/examples/spiffe-grpc/client/main.go
 func NewSpireClient(spireServer string, trustDomain string, uds string) (*SPIREClient, error) {
 	// Create a new SPIRE client using the SPIFFE Workload API
 	logger := logrus.New()

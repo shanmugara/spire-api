@@ -2,10 +2,11 @@ package api
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	grpc "spire-api/spire-grpc"
+
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -46,6 +47,10 @@ func GetEntries(sc *grpc.SPIREClient) gin.HandlerFunc {
 	}
 }
 
+// CreateEntry handles POST requests to add a new SPIRE entry.
+// It parses the incoming JSON payload into a grpc.Entry struct using c.ShouldBindJSON(&e),
+// which binds the request body to the struct and validates it. If binding fails, a 400 error is returned.
+// After successful binding, it sets the SpireDir, creates the entry, and updates K8s configs if needed.
 func CreateEntry(sc *grpc.SPIREClient, sd string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var e *grpc.Entry

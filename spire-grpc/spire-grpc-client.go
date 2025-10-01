@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+
 	entrypb "github.com/spiffe/spire-api-sdk/proto/spire/api/server/entry/v1"
 	"github.com/spiffe/spire-api-sdk/proto/spire/api/types"
 )
@@ -73,12 +74,18 @@ func (sc *SPIREClient) CreateEntry(e *Entry) (*entryID, error) {
 	sc.Logger.Infof("Creating entry")
 	var sel []*types.Selector
 
+	//default parentPath
 	pPath := fmt.Sprintf("/ns/%s/sa/%s", AgentNamespace, AgentServiceAccount)
+	//default namespace Key
 	nsKey := NS
+	//default serviceAccount Key
 	saKey := SA
+	//cluster selector
 	clusterSelector := ClusterSelectorK8s
+	//default spire key
 	spireKey := SpireK8s
 
+	// If the entry is for the agent itself, use the agent's parent path, namespace and keys
 	if e.ServiceAccount == AgentServiceAccount && e.Namespace == AgentNamespace {
 		pPath = ParentRoot
 		nsKey = KeyAgentNS
