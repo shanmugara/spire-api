@@ -55,6 +55,10 @@ func NewSpireClient(spireServer string, trustDomain string, uds string) (*SPIREC
 	return sc, nil
 }
 
+// NewClient creates a new SPIRE client using TLS with certs
+// This is an alternative to using the Workload API
+// It is less secure and not recommended for production use
+// It is useful for testing and development
 func NewClient(spireServer string) (*SPIREClient, error) {
 	// Create a new SPIRE client using cert and key files
 	logger := logrus.New()
